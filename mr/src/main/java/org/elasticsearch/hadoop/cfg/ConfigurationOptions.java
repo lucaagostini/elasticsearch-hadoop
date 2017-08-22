@@ -273,6 +273,9 @@ public interface ConfigurationOptions {
 
     String ES_NET_HTTP_HEADER_PREFIX = "es.net.http.header.";
 
+    String ES_NET_HTTP_HEADER_DECORATOR_CLASSPATH = "es.net.http.header_decorator.classpath";
+    String ES_NET_HTTP_HEADER_DECORATOR_ARGS_PREFIX = "es.net.http.header_decorator.args.";
+
     String ES_NET_HTTP_AUTH_USER = "es.net.http.auth.user";
     String ES_NET_HTTP_AUTH_PASS = "es.net.http.auth.pass";
 

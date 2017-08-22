@@ -6,7 +6,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.elasticsearch.hadoop.EsHadoopIllegalArgumentException;
 import org.elasticsearch.hadoop.cfg.Settings;
-import org.elasticsearch.hadoop.util.Assert;
 import org.elasticsearch.hadoop.util.StringUtils;
 
 import java.util.ArrayList;
@@ -15,6 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.elasticsearch.hadoop.cfg.ConfigurationOptions.ES_NET_HTTP_HEADER_DECORATOR_ARGS_PREFIX;
+import static org.elasticsearch.hadoop.cfg.ConfigurationOptions.ES_NET_HTTP_HEADER_DECORATOR_CLASSPATH;
 import static org.elasticsearch.hadoop.cfg.ConfigurationOptions.ES_NET_HTTP_HEADER_PREFIX;
 
 /**
@@ -96,6 +97,8 @@ public final class HeaderProcessor {
     }
 
     private final List<Header> headers;
+    private final String headerDecoratorClasspath;
+    private final Map<String, String> headerDecoratorParams = new HashMap<String, String>();
 
     public HeaderProcessor(Settings settings) {
         Map<String, String> workingHeaders = new HashMap<String, String>();
@@ -109,7 +112,15 @@ public final class HeaderProcessor {
                 ensureNotReserved(headerName, workingHeaders);
                 workingHeaders.put(headerName, extractHeaderValue(prop.getValue()));
             }
+
+            if (key.startsWith(ES_NET_HTTP_HEADER_DECORATOR_ARGS_PREFIX)) {
+                String argName = key.substring(ES_NET_HTTP_HEADER_DECORATOR_ARGS_PREFIX.length());
+                validateName(argName, prop);
+                headerDecoratorParams.put(argName, prop.getValue().toString());
+            }
         }
+
+        this.headerDecoratorClasspath = settings.asProperties().getProperty(ES_NET_HTTP_HEADER_DECORATOR_CLASSPATH, null);
 
         this.headers = new ArrayList<Header>(workingHeaders.keySet().size());
         for (Map.Entry<String, String> headerData : workingHeaders.entrySet()) {
@@ -169,6 +180,24 @@ public final class HeaderProcessor {
         // Add headers to the request.
         for (Header header : headers) {
             method.setRequestHeader(header);
+        }
+        // Add custom dymamic generated headers to the request
+        if(headerDecoratorClasspath != null) {
+            HeaderDecorator headerDecorator = null;
+            try {
+                LOG.debug("*** Creating header decorator class");
+                headerDecorator = (HeaderDecorator) Class.forName(headerDecoratorClasspath).newInstance();
+                LOG.debug("*** Header decorator class created");
+            } catch (Exception e) {
+                LOG.warn("Cannot instantiate the header class decorator " + headerDecoratorClasspath);
+            }
+            if (headerDecorator != null) {
+                headerDecorator.setParams(headerDecoratorParams);
+                for (Header header : headerDecorator.getHeaders(method)) {
+                    LOG.debug("*** header: " + header);
+                    method.setRequestHeader(header);
+                }
+            }
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Added HTTP Headers to method: " + Arrays.toString(method.getRequestHeaders()));

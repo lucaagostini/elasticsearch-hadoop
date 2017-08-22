@@ -466,6 +466,13 @@ public class CommonsHttpTransport implements Transport, StatsAware {
             entityMethod.setContentChunked(false);
         }
 
+        // Retrieve the hostname and adds it in the headers
+        String hostname = httpInfo;
+        if (httpInfo.indexOf(":") != -1) {
+            hostname = httpInfo.split(":")[0];
+        }
+        http.addRequestHeader("Host", hostname);
+
         headers.applyTo(http);
 
         // when tracing, log everything
